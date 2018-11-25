@@ -156,7 +156,7 @@ namespace ScreenRecorder
 
                 rect = _rect;
 
-                bmpScreenshot = new Bitmap((rect.Width / 2 + 1) * 2, (rect.Height / 2 + 1) * 2, PixelFormat.Format32bppArgb);
+                bmpScreenshot = new Bitmap((rect.Width / 2 + 1) * 2, (rect.Height / 2 + 1) * 2, PixelFormat.Format24bppRgb);
                 gfxScreenshot = Graphics.FromImage(bmpScreenshot);
 
             }
@@ -301,7 +301,7 @@ namespace ScreenRecorder
         void MakeAvi()
         {
             MjpegIterator mjpeg = new MjpegIterator("temp.avi");
-            MjpegAviRecorder.Write("output.avi", mjpeg, uint.Parse(textBox3.Text));            
+            MjpegAviRecorder.Write("output.avi", mjpeg, uint.Parse(textBox3.Text));
             mjpeg.Close();
             File.Delete("temp.avi");
             File.Move("output.avi", "temp.avi");
@@ -331,7 +331,7 @@ namespace ScreenRecorder
                 {
                     gfxScreenshot.Dispose();
                 }
-                bmpScreenshot = new Bitmap((rect.Width / 2 + 1) * 2, (rect.Height / 2 + 1) * 2, PixelFormat.Format32bppArgb);
+                bmpScreenshot = new Bitmap((rect.Width / 2 + 1) * 2, (rect.Height / 2 + 1) * 2, PixelFormat.Format24bppRgb);
                 gfxScreenshot = Graphics.FromImage(bmpScreenshot);
             }
         }
@@ -408,6 +408,56 @@ namespace ScreenRecorder
         private void panel1_Paint(object sender, PaintEventArgs e)
         {
 
+        }
+
+        AviContainer avi;
+        private void toolStripButton1_Click(object sender, EventArgs e)
+        {
+            OpenFileDialog ofd = new OpenFileDialog();
+            ofd.Filter = "Avi files (*.avi)|*.avi";
+            if (ofd.ShowDialog() == DialogResult.OK)
+            {
+                if (avi != null)
+                {
+                    avi.Close();
+                }
+                avi = new AviContainer(ofd.FileName);
+                textBox1.Text = avi.Fps.ToString();                
+            }
+        }
+
+        private void toolStripButton2_Click(object sender, EventArgs e)
+        {
+            if (avi != null)
+            {
+                if (MessageBox.Show("Update avi file: " + avi.Path + "?", Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                {
+                    avi.SaveFps();                    
+                    avi.Close();                    
+                }
+            }
+        }
+
+        private void textBox1_TextChanged(object sender, EventArgs e)
+        {
+            if (avi != null)
+            {
+                if (!uint.TryParse(textBox1.Text, out avi.Fps))
+                {
+                    textBox1.BackColor = Color.Red;
+                    textBox1.ForeColor = Color.White;
+                }
+                else
+                {
+                    textBox1.BackColor = Color.White;
+                    textBox1.ForeColor = Color.Black;
+                }
+            }
+        }
+
+        private void toolStripButton3_Click(object sender, EventArgs e)
+        {
+            
         }
     }
 }

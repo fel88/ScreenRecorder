@@ -4,7 +4,7 @@ namespace ScreenRecorder
 {
     public static class MjpegAviRecorder
     {
-        static void fwrite_DWORD(FileStream file_ptr, uint word)
+        public static void fwrite_DWORD(FileStream file_ptr, uint word)
         {
             for (int i = 0; i < 4; i++)
             {
@@ -13,7 +13,19 @@ namespace ScreenRecorder
             }
 
         }
-        static void fwrite_WORD(FileStream file_ptr, uint word)
+        public static uint fread_DWORD(FileStream file_ptr)
+        {
+            byte[] bb = new byte[4];
+            file_ptr.Read(bb, 0, 4);
+            uint ret = 0;
+            for (int i = 0; i < 4; i++)
+            {
+                ret |= (uint)(bb[i] << (i * 8));
+            }
+            return ret;
+
+        }
+        public static void fwrite_WORD(FileStream file_ptr, uint word)
         {
             for (int i = 0; i < 2; i++)
             {
@@ -28,7 +40,7 @@ namespace ScreenRecorder
 
             mjpeg.MoveTo(0);
             while (!mjpeg.Eof())
-            {                
+            {
                 var len = mjpeg.CurrentMem.Length;
                 if (len % 2 != 0) len += 1;
                 sizes += (ulong)len;
@@ -38,15 +50,15 @@ namespace ScreenRecorder
         }
 
         static void appendFrames(FileStream fs, MjpegIterator mjpeg)
-        {            
+        {
             mjpeg.MoveTo(0);
 
             ulong nbr_of_jpgs = (ulong)mjpeg.Count;
             while (!mjpeg.Eof())
-            {                
+            {
                 var len = mjpeg.CurrentMem.Length;
 
-                fs.WriteAsByteArray("00db");                
+                fs.WriteAsByteArray("00db");
                 fwrite_DWORD(fs, (uint)len);
 
                 var bb = mjpeg.CurrentMem.ToArray();
@@ -62,18 +74,18 @@ namespace ScreenRecorder
             ulong offset_count = 4;
             ulong index_length = 4 * 4 * nbr_of_jpgs;
 
-            fs.WriteAsByteArray("idx1");            
+            fs.WriteAsByteArray("idx1");
             fwrite_DWORD(fs, (uint)index_length);
-                        
+
             mjpeg.MoveTo(0);
 
             while (!mjpeg.Eof())
-            {                
+            {
                 var len = mjpeg.CurrentMem.Length;
                 if (len % 2 != 0) len++;
 
                 fs.WriteAsByteArray("00db");
-                
+
                 fwrite_DWORD(fs, (uint)AVI_KEYFRAME);
                 fwrite_DWORD(fs, (uint)offset_count);
                 fwrite_DWORD(fs, (uint)len);
@@ -82,10 +94,11 @@ namespace ScreenRecorder
             }
         }
 
+
         public static void Write(string path, MjpegIterator mjpeg, ulong fps)
         {
             if (File.Exists(path))
-            {                
+            {
                 File.Delete(path);
             }
             FileStream fs = new FileStream(path, FileMode.CreateNew, FileAccess.Write);
@@ -139,7 +152,7 @@ namespace ScreenRecorder
             fs.WriteAsByteArray("strl");
             fs.WriteAsByteArray("strh");
 
-            fwrite_DWORD(fs, 48);            
+            fwrite_DWORD(fs, 48);
             fs.WriteAsByteArray("vids");
             fs.WriteAsByteArray("MJPG");
 
@@ -194,4 +207,6 @@ namespace ScreenRecorder
             fs.Dispose();
         }
     }
+
+
 }
