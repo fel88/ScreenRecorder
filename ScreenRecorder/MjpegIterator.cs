@@ -9,7 +9,7 @@ namespace ScreenRecorder
     public class MjpegIterator
     {
         FileStream fs;
-        ImageFormat Format;
+        public ImageFormat Format { get; private set; }
         List<long> Shifts = new List<long>();
         byte[] marker;
         public MjpegIterator(string path)

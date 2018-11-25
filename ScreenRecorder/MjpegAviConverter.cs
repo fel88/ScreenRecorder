@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System.Drawing.Imaging;
+using System.IO;
 
 namespace ScreenRecorder
 {
@@ -158,7 +159,14 @@ namespace ScreenRecorder
             fwrite_WORD(fs, 1);
             fwrite_WORD(fs, 24);
 
-            fs.WriteAsByteArray("MPNG");
+            if (mjpeg.Format == ImageFormat.Png)
+            {
+                fs.WriteAsByteArray("MPNG");
+            }
+            if (mjpeg.Format == ImageFormat.Jpeg)
+            {
+                fs.WriteAsByteArray("MJPG");
+            }
 
             var strfbiSizeImage = ((jpgs_width * jpgs_height / 8 + 3) & 0xFFFFFFFC) * jpgs_height;
             fs.fwrite_DWORD((uint)strfbiSizeImage);
