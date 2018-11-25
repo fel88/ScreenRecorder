@@ -4,27 +4,7 @@ namespace ScreenRecorder
 {
     public static class MjpegAviRecorder
     {
-        public static void fwrite_DWORD(FileStream file_ptr, uint word)
-        {
-            for (int i = 0; i < 4; i++)
-            {
-                var pi = (byte)((word & (0xff << (i * 8))) >> i * 8);
-                file_ptr.WriteByte(pi);
-            }
 
-        }
-        public static uint fread_DWORD(FileStream file_ptr)
-        {
-            byte[] bb = new byte[4];
-            file_ptr.Read(bb, 0, 4);
-            uint ret = 0;
-            for (int i = 0; i < 4; i++)
-            {
-                ret |= (uint)(bb[i] << (i * 8));
-            }
-            return ret;
-
-        }
         public static void fwrite_WORD(FileStream file_ptr, uint word)
         {
             for (int i = 0; i < 2; i++)
@@ -59,7 +39,7 @@ namespace ScreenRecorder
                 var len = mjpeg.CurrentMem.Length;
 
                 fs.WriteAsByteArray("00db");
-                fwrite_DWORD(fs, (uint)len);
+                fs.fwrite_DWORD((uint)len);
 
                 var bb = mjpeg.CurrentMem.ToArray();
                 fs.Write(bb, 0, bb.Length);
@@ -75,7 +55,7 @@ namespace ScreenRecorder
             ulong index_length = 4 * 4 * nbr_of_jpgs;
 
             fs.WriteAsByteArray("idx1");
-            fwrite_DWORD(fs, (uint)index_length);
+            fs.fwrite_DWORD((uint)index_length);
 
             mjpeg.MoveTo(0);
 
@@ -86,9 +66,9 @@ namespace ScreenRecorder
 
                 fs.WriteAsByteArray("00db");
 
-                fwrite_DWORD(fs, (uint)AVI_KEYFRAME);
-                fwrite_DWORD(fs, (uint)offset_count);
-                fwrite_DWORD(fs, (uint)len);
+                fs.fwrite_DWORD((uint)AVI_KEYFRAME);
+                fs.fwrite_DWORD((uint)offset_count);
+                fs.fwrite_DWORD((uint)len);
                 offset_count += (uint)(len + 8);
                 if (!mjpeg.Next()) break;
             }
@@ -113,93 +93,93 @@ namespace ScreenRecorder
 
             var len = get_all_sizes(mjpeg);
             var RIFF_LISTdwSize = (uint)(150 + 12 + len + 8 * count + 8 + 4 * 4 * count);
-            fwrite_DWORD(fs, RIFF_LISTdwSize);
+            fs.fwrite_DWORD(RIFF_LISTdwSize);
             fs.WriteAsByteArray("AVI ");
             fs.WriteAsByteArray("LIST");
 
-            fwrite_DWORD(fs, 208);
+            fs.fwrite_DWORD(208);
             fs.WriteAsByteArray("hdrl");
             fs.WriteAsByteArray("avih");
 
-            fwrite_DWORD(fs, 56);
+            fs.fwrite_DWORD(56);
             var avihdwMicroSecPerFrame = (uint)(1000000 / fps);
-            fwrite_DWORD(fs, avihdwMicroSecPerFrame);
+            fs.fwrite_DWORD(avihdwMicroSecPerFrame);
 
             var avihdwMaxBytesPerSec = 7000;
-            fwrite_DWORD(fs, (uint)avihdwMaxBytesPerSec);
+            fs.fwrite_DWORD((uint)avihdwMaxBytesPerSec);
 
             var avihdwPaddingGranularity = 0;
-            fwrite_DWORD(fs, (uint)avihdwPaddingGranularity);
+            fs.fwrite_DWORD((uint)avihdwPaddingGranularity);
 
 
-            fwrite_DWORD(fs, (uint)16);
-            fwrite_DWORD(fs, (uint)count);
-            fwrite_DWORD(fs, (uint)0);
-            fwrite_DWORD(fs, (uint)1);
+            fs.fwrite_DWORD((uint)16);
+            fs.fwrite_DWORD((uint)count);
+            fs.fwrite_DWORD((uint)0);
+            fs.fwrite_DWORD((uint)1);
 
-            fwrite_DWORD(fs, (uint)0);
-            fwrite_DWORD(fs, (uint)jpgs_width);
-            fwrite_DWORD(fs, (uint)jpgs_height);
-            fwrite_DWORD(fs, (uint)0);
-            fwrite_DWORD(fs, (uint)0);
-            fwrite_DWORD(fs, (uint)0);
-            fwrite_DWORD(fs, (uint)0);
+            fs.fwrite_DWORD((uint)0);
+            fs.fwrite_DWORD((uint)jpgs_width);
+            fs.fwrite_DWORD((uint)jpgs_height);
+            fs.fwrite_DWORD((uint)0);
+            fs.fwrite_DWORD((uint)0);
+            fs.fwrite_DWORD((uint)0);
+            fs.fwrite_DWORD((uint)0);
 
             fs.WriteAsByteArray("LIST");
 
-            fwrite_DWORD(fs, (uint)132);
+            fs.fwrite_DWORD((uint)132);
 
             fs.WriteAsByteArray("strl");
             fs.WriteAsByteArray("strh");
 
-            fwrite_DWORD(fs, 48);
+            fs.fwrite_DWORD(48);
             fs.WriteAsByteArray("vids");
             fs.WriteAsByteArray("MJPG");
 
-            fwrite_DWORD(fs, 0);
+            fs.fwrite_DWORD(0);
             fwrite_WORD(fs, 0);
             fwrite_WORD(fs, 0);
-            fwrite_DWORD(fs, 0);
-            fwrite_DWORD(fs, 1);
+            fs.fwrite_DWORD(0);
+            fs.fwrite_DWORD(1);
 
-            fwrite_DWORD(fs, (uint)fps);
-            fwrite_DWORD(fs, 0);
-            fwrite_DWORD(fs, (uint)count);
-            fwrite_DWORD(fs, 0);
-            fwrite_DWORD(fs, 0);
+            fs.fwrite_DWORD((uint)fps);
+            fs.fwrite_DWORD(0);
+            fs.fwrite_DWORD((uint)count);
+            fs.fwrite_DWORD(0);
+            fs.fwrite_DWORD(0);
 
-            fwrite_DWORD(fs, 0);
+            fs.fwrite_DWORD(0);
             fs.WriteAsByteArray("strf");
 
-            fwrite_DWORD(fs, 40);
-            fwrite_DWORD(fs, 40);
-            fwrite_DWORD(fs, (uint)jpgs_width);
-            fwrite_DWORD(fs, (uint)jpgs_height);
+            fs.fwrite_DWORD(40);
+            fs.fwrite_DWORD(40);
+            fs.fwrite_DWORD((uint)jpgs_width);
+            fs.fwrite_DWORD((uint)jpgs_height);
             fwrite_WORD(fs, 1);
             fwrite_WORD(fs, 24);
 
             fs.WriteAsByteArray("MPNG");
 
             var strfbiSizeImage = ((jpgs_width * jpgs_height / 8 + 3) & 0xFFFFFFFC) * jpgs_height;
-            fwrite_DWORD(fs, (uint)strfbiSizeImage);
-            fwrite_DWORD(fs, 0);
-            fwrite_DWORD(fs, 0);
-            fwrite_DWORD(fs, 0);
-            fwrite_DWORD(fs, 0);
+            fs.fwrite_DWORD((uint)strfbiSizeImage);
+            fs.fwrite_DWORD(0);
+            fs.fwrite_DWORD(0);
+            fs.fwrite_DWORD(0);
+            fs.fwrite_DWORD(0);
 
             fs.WriteAsByteArray("LIST");
 
-            fwrite_DWORD(fs, 16);
+            fs.fwrite_DWORD(16);
 
             fs.WriteAsByteArray("odml");
             fs.WriteAsByteArray("dmlh");
 
-            fwrite_DWORD(fs, 4);
-            fwrite_DWORD(fs, (uint)count);
+            fs.fwrite_DWORD(4);
+            fs.fwrite_DWORD((uint)count);
             fs.WriteAsByteArray("LIST");
 
             var movidwSize = len + 4 + 8 * count;
-            fwrite_DWORD(fs, (uint)movidwSize);
+            fs.fwrite_DWORD((uint)movidwSize);
 
             fs.WriteAsByteArray("movi");
             appendFrames(fs, mjpeg);

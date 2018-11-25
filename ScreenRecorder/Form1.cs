@@ -19,6 +19,12 @@ namespace ScreenRecorder
             InitializeComponent();
             UpdateList();
 
+            comboBox1.Items.Add(new ComboBoxItem() { Name = "24bpp", Tag = PixelFormat.Format24bppRgb });
+            comboBox1.Items.Add(new ComboBoxItem() { Name = "8 bit Indexed", Tag = PixelFormat.Format8bppIndexed });
+            comboBox1.Items.Add(new ComboBoxItem() { Name = "4 bit Indexed", Tag = PixelFormat.Format4bppIndexed });
+            comboBox1.Items.Add(new ComboBoxItem() { Name = "1 bit Indexed", Tag = PixelFormat.Format1bppIndexed });
+            comboBox1.SelectedIndex = 0;
+
             checkBox4.Enabled = false;
             DoubleBuffered = true;
             listView1.DoubleBuffered(true);
@@ -225,20 +231,26 @@ namespace ScreenRecorder
                     MemoryStream ms = new MemoryStream();
                     if (radioButton2.Checked)
                     {
-                        bmpScreenshot.Save(ms, ImageFormat.Png);
+                        bmpScreenshot.Clone(new Rectangle(0, 0, bmpScreenshot.Width, bmpScreenshot.Height), CurrentPixelFormat).Save(ms, ImageFormat.Png);
                     }
                     else
                     {
                         bmpScreenshot.Save(ms, jgpEncoder, myEncoderParameters);
                     }
                     fs.Write(ms.ToArray(), 0, (int)ms.Length);
-                    toolStripStatusLabel1.Text = "Record on. Size: " + (fs.Length / (1024f * 1024f) + " MB");
+                    toolStripStatusLabel1.Text = "Record on. Size: " + ((fs.Length / (1024f * 1024f)).ToString("0.0") + " MB") + "; Frames captured: " + cntr;
                 }
+                cntr++;
             }
-            cntr++;
         }
 
-
+        PixelFormat CurrentPixelFormat
+        {
+            get
+            {
+                return (PixelFormat)((comboBox1.SelectedItem as ComboBoxItem).Tag);
+            }
+        }
 
         private void checkBox1_CheckedChanged(object sender, EventArgs e)
         {
@@ -254,6 +266,8 @@ namespace ScreenRecorder
             timer1.Enabled = checkBox1.Checked;
             if (checkBox1.Checked)
             {
+                cntr = 0;
+                pause = false;
                 checkBox1.Image = RecStopIcon;
                 checkBox4.Enabled = true;
                 if (File.Exists("temp.avi"))
@@ -421,8 +435,14 @@ namespace ScreenRecorder
                 {
                     avi.Close();
                 }
+                crntFrame = 0;
                 avi = new AviContainer(ofd.FileName);
-                textBox1.Text = avi.Fps.ToString();                
+                pictureBox2.Image = avi.GetFrame(0);
+                trackBar1.Maximum = avi.Frames;
+                textBox1.Text = avi.Fps.ToString();
+                textBox4.Text = avi.Frames.ToString();
+
+                timer2.Interval = (int)(1000f / avi.Fps);
             }
         }
 
@@ -432,8 +452,8 @@ namespace ScreenRecorder
             {
                 if (MessageBox.Show("Update avi file: " + avi.Path + "?", Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
                 {
-                    avi.SaveFps();                    
-                    avi.Close();                    
+                    avi.SaveFps();
+                    avi.Close();
                 }
             }
         }
@@ -455,9 +475,66 @@ namespace ScreenRecorder
             }
         }
 
-        private void toolStripButton3_Click(object sender, EventArgs e)
+        void SetPlayFrame(int index)
         {
-            
+            if (pictureBox2.Image != null)
+            {
+                pictureBox2.Image.Dispose();
+            }
+            pictureBox2.Image = avi.GetFrame(index);
+        }
+        private void trackBar1_Scroll(object sender, EventArgs e)
+        {
+            if (avi != null && !isPlay)
+            {
+                SetPlayFrame(trackBar1.Value);
+                crntFrame = trackBar1.Value;
+            }
+        }
+
+        private void pictureBox2_Click(object sender, EventArgs e)
+        {
+            var i = (int)pictureBox2.SizeMode;
+            i++;
+            var vals = Enum.GetValues(typeof(PictureBoxSizeMode));
+            i %= vals.Length;
+
+            pictureBox2.SizeMode = (PictureBoxSizeMode)i;
+        }
+        bool isPlay = false;
+        int crntFrame = 0;
+        private void timer2_Tick(object sender, EventArgs e)
+        {
+            if (!isPlay) return;
+            crntFrame++;
+            if (crntFrame >= avi.Frames)
+            {
+                isPlay = false;
+                return;
+            }
+            SetPlayFrame(crntFrame);
+            trackBar1.Value = crntFrame;
+
+
+        }
+
+        private void checkBox5_CheckedChanged(object sender, EventArgs e)
+        {
+            isPlay = !isPlay;
+
+            trackBar1.Enabled = !isPlay;
+
         }
     }
+
+    public class ComboBoxItem
+    {
+        public string Name;
+        public object Tag;
+        public override string ToString()
+        {
+            return Name;
+        }
+    }
+
 }
