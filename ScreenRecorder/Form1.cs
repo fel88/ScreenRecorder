@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace ScreenRecorder
@@ -482,6 +483,21 @@ namespace ScreenRecorder
                 pictureBox2.Image.Dispose();
             }
             pictureBox2.Image = avi.GetFrame(index);
+
+
+            //play audio
+            /*var bytes = avi.GetAudioFrames(index);
+            if (bytes.Length > 0)
+            {
+                IntPtr unmanagedPointer = Marshal.AllocHGlobal(bytes.Length);
+                Marshal.Copy(bytes, 0, unmanagedPointer, bytes.Length);
+                // Call unmanaged code
+                w.SendWODevice(unmanagedPointer, (uint)bytes.Length);
+                //Marshal.FreeHGlobal(unmanagedPointer);
+            }*/
+
+
+
         }
         private void trackBar1_Scroll(object sender, EventArgs e)
         {
@@ -489,6 +505,7 @@ namespace ScreenRecorder
             {
                 SetPlayFrame(trackBar1.Value);
                 crntFrame = trackBar1.Value;
+                textBox4.Text = crntFrame + " / " + avi.Frames;
             }
         }
 
@@ -507,11 +524,13 @@ namespace ScreenRecorder
         {
             if (!isPlay) return;
             crntFrame++;
+            textBox4.Text = crntFrame + " / " + avi.Frames;
             if (crntFrame >= avi.Frames)
             {
                 isPlay = false;
                 return;
             }
+
             SetPlayFrame(crntFrame);
             trackBar1.Value = crntFrame;
 
@@ -520,10 +539,48 @@ namespace ScreenRecorder
 
         private void checkBox5_CheckedChanged(object sender, EventArgs e)
         {
+
+
             isPlay = !isPlay;
+            if (isPlay)
+            {
+                crntFrame = 0;
+                w.InitWODevice(48000, 2, 16, false);  // initialise the audio device  
+                for (int i = 0; i < avi.AudioFrames; i++)
+                {
+                    var bytes = avi.GetAudioFrame(i);
+                    IntPtr unmanagedPointer = Marshal.AllocHGlobal(bytes.Length);
+                    Marshal.Copy(bytes, 0, unmanagedPointer, bytes.Length);
+                    // Call unmanaged code
+                    w.SendWODevice(unmanagedPointer, (uint)bytes.Length);
+                    //Marshal.FreeHGlobal(unmanagedPointer);
 
+                }
+            }
+            else
+            {
+                w.RawResetWODevice();
+                w.CloseWODevice();
+            }
             trackBar1.Enabled = !isPlay;
+        }
+        woLib w = new ScreenRecorder.woLib();
+        private void button1_Click(object sender, EventArgs e)
+        {
 
+            w.InitWODevice(48000, 2, 16, false);  // initialise the audio device  
+            for (int i = 0; i < avi.AudioFrames; i++)
+            {
+                var bytes = avi.GetAudioFrame(i);
+                IntPtr unmanagedPointer = Marshal.AllocHGlobal(bytes.Length);
+                Marshal.Copy(bytes, 0, unmanagedPointer, bytes.Length);
+                // Call unmanaged code
+                w.SendWODevice(unmanagedPointer, (uint)bytes.Length);
+                //Marshal.FreeHGlobal(unmanagedPointer);
+
+            }
+            // while (w.GetQueued() > 0) ;
+            // w.CloseWODevice();
         }
     }
 
@@ -536,5 +593,8 @@ namespace ScreenRecorder
             return Name;
         }
     }
+
+
+
 
 }
