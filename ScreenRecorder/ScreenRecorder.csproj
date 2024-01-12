@@ -52,6 +52,7 @@
     <Compile Include="ComboBoxItem.cs" />
     <Compile Include="ControlExtensions.cs" />
     <Compile Include="Extensions.cs" />
+    <Compile Include="KeysHintsLocation.cs" />
     <Compile Include="MjpegIterator.cs" />
     <Compile Include="RECT.cs" />
     <Compile Include="User32.cs" />

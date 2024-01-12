@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace ScreenRecorder
@@ -19,6 +22,8 @@ namespace ScreenRecorder
         {
             InitializeComponent();
             UpdateList();
+
+            comboBox2.SelectedIndex = 0;
 
             comboBox1.Items.Add(new ComboBoxItem() { Name = "24bpp", Tag = PixelFormat.Format24bppRgb });
             comboBox1.Items.Add(new ComboBoxItem() { Name = "8 bit Indexed", Tag = PixelFormat.Format8bppIndexed });
@@ -79,7 +84,12 @@ namespace ScreenRecorder
 
         }
 
-
+        public static async Task CopyFileAsync(string sourceFile, string destinationFile)
+        {
+            using (var sourceStream = new FileStream(sourceFile, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.Asynchronous | FileOptions.SequentialScan))
+            using (var destinationStream = new FileStream(destinationFile, FileMode.Create, FileAccess.Write, FileShare.None, 4096, FileOptions.Asynchronous | FileOptions.SequentialScan))
+                await sourceStream.CopyToAsync(destinationStream);
+        }
 
         public void UpdateList()
         {
@@ -93,10 +103,12 @@ namespace ScreenRecorder
             User32.EnumWindows(delegate (IntPtr wnd, IntPtr param)
             {
                 var txt = User32.GetWindowText(wnd);
+                RECT _rect;
+                User32.GetWindowRect(wnd, out _rect);
 
                 if (!string.IsNullOrEmpty(txt) && txt.ToUpper().Contains(watermark1.Text.ToUpper()))
                 {
-                    listView1.Items.Add(new ListViewItem(new string[] { txt, wnd.ToString() }) { Tag = wnd });
+                    listView1.Items.Add(new ListViewItem(new string[] { txt, wnd.ToString(), $"{_rect.Width}x{_rect.Height}" }) { Tag = wnd });
                 }
                 return true;
             }, IntPtr.Zero);
@@ -141,20 +153,29 @@ namespace ScreenRecorder
         {
 
             RECT _rect;
-            User32.GetWindowRect(hwn, out _rect);
+
             label1.BackColor = Color.Green;
             label1.ForeColor = Color.White;
-            if (!User32.IsWindow(hwn))
+            if (wholeScreen)
             {
-                label1.Text = "Incorrect window";
-                label1.BackColor = Color.Red;
-                label1.ForeColor = Color.White;
-                return;
+                var b = Screen.PrimaryScreen.Bounds;
+                _rect = new RECT() { Left = b.Left, Top = b.Top, Width = b.Width, Height = b.Height };
             }
+            else
+            {
+                User32.GetWindowRect(hwn, out _rect);
+                if (!User32.IsWindow(hwn))
+                {
+                    label1.Text = "Incorrect window";
+                    label1.BackColor = Color.Red;
+                    label1.ForeColor = Color.White;
+                    return;
+                }
+            }
+
             if (_rect.Width <= 0 || _rect.Height <= 0)
-            {
                 return;
-            }
+
             if (_rect.Width != rect.Width || _rect.Height != rect.Height)
             {
                 //size changed
@@ -165,11 +186,9 @@ namespace ScreenRecorder
 
                 bmpScreenshot = new Bitmap((rect.Width / 2 + 1) * 2, (rect.Height / 2 + 1) * 2, PixelFormat.Format24bppRgb);
                 gfxScreenshot = Graphics.FromImage(bmpScreenshot);
-
             }
 
             rect = _rect;
-
 
             gfxScreenshot.CopyFromScreen(rect.Left, rect.Top, 0, 0, rect.Size, CopyPixelOperation.SourceCopy);
             //User32.PrintWindow(hwn,)
@@ -204,11 +223,18 @@ namespace ScreenRecorder
                 {
                     if (User32.GetAsyncKeyState((Keys)item) != 0)
                     {
-                        var ms = gfxScreenshot.MeasureString(item.ToString(), hintFont);
-                        gfxScreenshot.FillRectangle(new SolidBrush(Color.FromArgb(128, Color.Blue)), 5 + xx, 5, ms.Width, hintFont.Height);
-                        gfxScreenshot.DrawString(item.ToString(), hintFont, Brushes.White, 5 + xx, 5);
-
-                        xx += (int)ms.Width + 10;
+                        int yy = 5;
+                        if (KeysHintsLocation == KeysHintsLocation.BottomLeft)
+                        {
+                            yy = rect.Height - hintFont.Height - 5;
+                        }
+                        if (item.ToString().Length > 0)
+                        {
+                            var ms = gfxScreenshot.MeasureString(item.ToString(), hintFont);
+                            gfxScreenshot.FillRectangle(new SolidBrush(Color.FromArgb(128, Color.Blue)), 5 + xx, yy, ms.Width, hintFont.Height);
+                            gfxScreenshot.DrawString(item.ToString(), hintFont, Brushes.White, 5 + xx, yy);
+                            xx += (int)ms.Width + 10;
+                        }
                     }
                 }
             }
@@ -255,7 +281,7 @@ namespace ScreenRecorder
 
         private void checkBox1_CheckedChanged(object sender, EventArgs e)
         {
-            if (!User32.IsWindow(hwn))
+            if (!wholeScreen && !User32.IsWindow(hwn))
             {
                 label1.Text = "Incorrect window";
                 label1.BackColor = Color.Red;
@@ -277,46 +303,61 @@ namespace ScreenRecorder
                 }
                 watermark1.Enabled = false;
                 listView1.Enabled = false;
+                checkBox6.Enabled = false;
             }
             else
             {
-                watermark1.Enabled = true;
-                listView1.Enabled = true;
-                pause = false;
-                checkBox4.Text = "Pause";
-                checkBox4.Image = RecPauseIcon;
-                checkBox4.Enabled = false;
-                checkBox1.Image = RecStartIcon;
-                SaveFileDialog sfd = new SaveFileDialog();
-                sfd.Filter = "Avi files (*.avi)|*.avi";
-                if (MessageBox.Show("Save avi file?", Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
-                {
-                    if (sfd.ShowDialog() == DialogResult.OK)
-                    {
-                        bool rewr = true;
-                        if (File.Exists(sfd.FileName))
-                        {
-                            if (MessageBox.Show("File exist: " + sfd.FileName + ". Overwrite?", Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.No)
-                            {
-                                rewr = false;
-                            }
-                        }
+                StopRecord();
+            }
+        }
 
-                        if (rewr)
+        public async void StopRecord()
+        {
+            watermark1.Enabled = true;
+            listView1.Enabled = true;
+            checkBox6.Enabled = true;
+
+            pause = false;
+            checkBox4.Text = "Pause";
+            checkBox4.Image = RecPauseIcon;
+            checkBox4.Enabled = false;
+            checkBox1.Image = RecStartIcon;
+            SaveFileDialog sfd = new SaveFileDialog();
+            sfd.Filter = "Avi files (*.avi)|*.avi";
+            if (MessageBox.Show("Save avi file?", Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+            {
+                if (sfd.ShowDialog() == DialogResult.OK)
+                {
+                    bool rewr = true;
+                    if (File.Exists(sfd.FileName))
+                    {
+                        if (MessageBox.Show("File exist: " + sfd.FileName + ". Overwrite?", Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.No)
                         {
-                            MakeAvi();
-                            File.Copy("temp.avi", sfd.FileName, true);
-                            toolStripStatusLabel1.Text = "File saved: " + sfd.FileName;
+                            rewr = false;
+                        }
+                    }
+
+                    if (rewr)
+                    {
+                        MakeAvi();
+                        await CopyFileAsync("temp.avi", sfd.FileName);
+                        //File.Copy("temp.avi", sfd.FileName, true);
+                        toolStripStatusLabel1.Text = "File saved: " + sfd.FileName;
+                        if (MessageBox.Show("Run file: " + sfd.FileName + "?", Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                        {
+                            Process.Start(sfd.FileName);
                         }
                     }
                 }
             }
         }
 
+        uint fps = 30;
+
         void MakeAvi()
         {
             MjpegIterator mjpeg = new MjpegIterator("temp.avi");
-            MjpegAviRecorder.Write("output.avi", mjpeg, uint.Parse(textBox3.Text));
+            MjpegAviRecorder.Write("output.avi", mjpeg, fps);
             mjpeg.Close();
             File.Delete("temp.avi");
             File.Move("output.avi", "temp.avi");
@@ -324,31 +365,32 @@ namespace ScreenRecorder
 
         private void listView1_SelectedIndexChanged(object sender, EventArgs e)
         {
-            if (listView1.SelectedItems.Count > 0)
+            if (listView1.SelectedItems.Count <= 0)
+                return;
+
+            IntPtr wnd = (IntPtr)listView1.SelectedItems[0].Tag;
+            if (pictureBox1.Image != null)
             {
-                IntPtr wnd = (IntPtr)listView1.SelectedItems[0].Tag;
-                if (pictureBox1.Image != null)
-                {
-                    pictureBox1.Image.Dispose();
-                }
-                pictureBox1.Image = User32.CaptureImage(wnd);
-
-                hwn = wnd;
-                label1.Text = "Handle: " + wnd.ToString();
-
-                User32.GetWindowRect(hwn, out rect);
-
-                if (bmpScreenshot != null)
-                {
-                    bmpScreenshot.Dispose();
-                }
-                if (gfxScreenshot != null)
-                {
-                    gfxScreenshot.Dispose();
-                }
-                bmpScreenshot = new Bitmap((rect.Width / 2 + 1) * 2, (rect.Height / 2 + 1) * 2, PixelFormat.Format24bppRgb);
-                gfxScreenshot = Graphics.FromImage(bmpScreenshot);
+                pictureBox1.Image.Dispose();
             }
+            pictureBox1.Image = User32.CaptureImage(wnd);
+
+            hwn = wnd;
+            label1.Text = "Handle: " + wnd.ToString();
+
+            User32.GetWindowRect(hwn, out rect);
+
+            if (bmpScreenshot != null)
+            {
+                bmpScreenshot.Dispose();
+            }
+            if (gfxScreenshot != null)
+            {
+                gfxScreenshot.Dispose();
+            }
+            bmpScreenshot = new Bitmap((rect.Width / 2 + 1) * 2, (rect.Height / 2 + 1) * 2, PixelFormat.Format24bppRgb);
+            gfxScreenshot = Graphics.FromImage(bmpScreenshot);
+
         }
 
         IntPtr hwn;
@@ -583,6 +625,47 @@ namespace ScreenRecorder
         private void textBox2_TextChanged(object sender, EventArgs e)
         {
             jpegQuality = int.Parse(textBox2.Text);
+        }
+
+        bool wholeScreen = false;
+        private void checkBox6_CheckedChanged(object sender, EventArgs e)
+        {
+            wholeScreen = checkBox6.Checked;
+            if (wholeScreen)
+            {
+                var b = Screen.PrimaryScreen.Bounds;
+                rect = new RECT() { Left = b.Left, Top = b.Top, Width = b.Width, Height = b.Height };
+
+                if (bmpScreenshot != null)
+                {
+                    bmpScreenshot.Dispose();
+                }
+                if (gfxScreenshot != null)
+                {
+                    gfxScreenshot.Dispose();
+                }
+                bmpScreenshot = new Bitmap((rect.Width / 2 + 1) * 2, (rect.Height / 2 + 1) * 2, PixelFormat.Format24bppRgb);
+                gfxScreenshot = Graphics.FromImage(bmpScreenshot);
+
+            }
+            listView1.Enabled = !wholeScreen;
+        }
+
+        private void textBox3_TextChanged(object sender, EventArgs e)
+        {
+            fps = uint.Parse(textBox3.Text);
+        }
+
+        public KeysHintsLocation KeysHintsLocation;
+
+        private void numericUpDown1_ValueChanged(object sender, EventArgs e)
+        {
+            hintFont = new Font("Consolas", (int)numericUpDown1.Value);
+        }
+
+        private void comboBox2_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            KeysHintsLocation = comboBox2.SelectedIndex == 1 ? KeysHintsLocation.BottomLeft : KeysHintsLocation.TopLeft;
         }
     }
 }
