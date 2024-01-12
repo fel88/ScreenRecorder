@@ -222,7 +222,7 @@ namespace ScreenRecorder
 
             EncoderParameters myEncoderParameters = new EncoderParameters(1);
 
-            EncoderParameter myEncoderParameter = new EncoderParameter(myEncoder, int.Parse(textBox2.Text));
+            EncoderParameter myEncoderParameter = new EncoderParameter(myEncoder, jpegQuality);
             myEncoderParameters.Param[0] = myEncoderParameter;
 
             if (!pause)
@@ -533,14 +533,10 @@ namespace ScreenRecorder
 
             SetPlayFrame(crntFrame);
             trackBar1.Value = crntFrame;
-
-
         }
 
         private void checkBox5_CheckedChanged(object sender, EventArgs e)
         {
-
-
             isPlay = !isPlay;
             if (isPlay)
             {
@@ -582,19 +578,11 @@ namespace ScreenRecorder
             // while (w.GetQueued() > 0) ;
             // w.CloseWODevice();
         }
-    }
 
-    public class ComboBoxItem
-    {
-        public string Name;
-        public object Tag;
-        public override string ToString()
+        int jpegQuality = 90;
+        private void textBox2_TextChanged(object sender, EventArgs e)
         {
-            return Name;
+            jpegQuality = int.Parse(textBox2.Text);
         }
     }
-
-
-
-
 }
