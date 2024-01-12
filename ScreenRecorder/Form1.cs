@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -202,7 +203,16 @@ namespace ScreenRecorder
             {
                 if (radioButton4.Checked)
                 {
-                    gfxScreenshot.DrawEllipse(new Pen(Color.Red, 2), pos.X - w / 2, pos.Y - w / 2, w, w);
+                    Pen pen = new Pen(Color.Red, 2);
+                    Keys[] mouseKeys = new[] { Keys.LButton, Keys.RButton };
+                    if (mouseKeys.Any(z => User32.GetAsyncKeyState(z) != 0))
+                    {
+                        pen = new Pen(Color.Blue, 2);
+                    }
+                    var temp = gfxScreenshot.SmoothingMode;
+                    gfxScreenshot.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                    gfxScreenshot.DrawEllipse(pen, pos.X - w / 2, pos.Y - w / 2, w, w);
+                    gfxScreenshot.SmoothingMode = temp;
                 }
             }
 
@@ -265,7 +275,7 @@ namespace ScreenRecorder
                         bmpScreenshot.Save(ms, jgpEncoder, myEncoderParameters);
                     }
                     fs.Write(ms.ToArray(), 0, (int)ms.Length);
-                    toolStripStatusLabel1.Text = "Record on. Size: " + ((fs.Length / (1024f * 1024f)).ToString("0.0") + " MB") + "; Frames captured: " + cntr;
+                    toolStripStatusLabel1.Text = $"Record on. Size: {((fs.Length / (1024f * 1024f)).ToString("0.0") + " MB")}; Frames captured: {cntr} time: {recSw.Elapsed}";
                 }
                 cntr++;
             }
@@ -279,6 +289,7 @@ namespace ScreenRecorder
             }
         }
 
+        Stopwatch recSw = new Stopwatch();
         private void checkBox1_CheckedChanged(object sender, EventArgs e)
         {
             if (!wholeScreen && !User32.IsWindow(hwn))
@@ -304,6 +315,7 @@ namespace ScreenRecorder
                 watermark1.Enabled = false;
                 listView1.Enabled = false;
                 checkBox6.Enabled = false;
+                recSw.Start();
             }
             else
             {
@@ -313,6 +325,8 @@ namespace ScreenRecorder
 
         public async void StopRecord()
         {
+            var realFps = cntr / recSw.Elapsed.TotalSeconds;
+            recSw.Stop();
             watermark1.Enabled = true;
             listView1.Enabled = true;
             checkBox6.Enabled = true;
@@ -339,7 +353,7 @@ namespace ScreenRecorder
 
                     if (rewr)
                     {
-                        MakeAvi();
+                        MakeAvi((ulong)realFps);
                         await CopyFileAsync("temp.avi", sfd.FileName);
                         //File.Copy("temp.avi", sfd.FileName, true);
                         toolStripStatusLabel1.Text = "File saved: " + sfd.FileName;
@@ -354,7 +368,7 @@ namespace ScreenRecorder
 
         uint fps = 30;
 
-        void MakeAvi()
+        void MakeAvi(ulong fps)
         {
             MjpegIterator mjpeg = new MjpegIterator("temp.avi");
             MjpegAviRecorder.Write("output.avi", mjpeg, fps);
@@ -654,6 +668,7 @@ namespace ScreenRecorder
         private void textBox3_TextChanged(object sender, EventArgs e)
         {
             fps = uint.Parse(textBox3.Text);
+            timer1.Interval = (int)fps;            
         }
 
         public KeysHintsLocation KeysHintsLocation;
@@ -666,6 +681,11 @@ namespace ScreenRecorder
         private void comboBox2_SelectedIndexChanged(object sender, EventArgs e)
         {
             KeysHintsLocation = comboBox2.SelectedIndex == 1 ? KeysHintsLocation.BottomLeft : KeysHintsLocation.TopLeft;
+        }
+
+        private void radioButton4_CheckedChanged(object sender, EventArgs e)
+        {
+
         }
     }
 }
